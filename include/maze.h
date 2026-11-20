@@ -18,10 +18,10 @@ typedef enum {
     CELL_END   = 3
 } MazeCell;
 
-EXPORT uint8_t* generate_maze(int width, int height);
+EXPORT uint8_t* generate_maze(int width, int height, int difficulty);
 EXPORT void free_maze(uint8_t *grid);
 
-void carve(uint8_t *grid, int width, int height, int x, int y);
+void carve(uint8_t *grid, int width, int height, int x, int y, int percentWall);
 void shuffle(int *array, int n);
 
 #endif

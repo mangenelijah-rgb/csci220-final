@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <maze.h>
+#include <math.h>
 
 // Fisher-Yates shuffle algorithm; randomly change directions
 void shuffle(int *array, int n) {
@@ -13,7 +14,7 @@ void shuffle(int *array, int n) {
     }
 }
 
-void carve(uint8_t *grid, int width, int height, int x, int y) {
+void carve(uint8_t *grid, int width, int height, int x, int y, int percentWall) {
     int directions[] = {0, 1, 2, 3};
     shuffle(directions, 4);
 
@@ -30,8 +31,11 @@ void carve(uint8_t *grid, int width, int height, int x, int y) {
             if (grid[ny * width + nx] == 1) { //if (nx,ny) is a wall
                 grid[(y + dy[dir] / 2) * width + (x + dx[dir] / 2)] = 0;
                 grid[ny * width + nx] = 0; // Set (nx,ny) and (nx-1,ny-1) to paths
-                carve(grid, width, height, nx, ny); //Recursive call until algorithm encounters a path or array boundary
+                carve(grid, width, height, nx, ny, percentWall); //Recursive call until algorithm encounters a path or array boundary
             } // After recursive call returns, for loop checks the next direction
+            else if ((rand()%100) >= percentWall) {
+                grid[(y + dy[dir] / 2) * width + (x + dx[dir] / 2)] = 0;
+            }
         }
     }
 }
@@ -39,7 +43,7 @@ void carve(uint8_t *grid, int width, int height, int x, int y) {
 // Function to generate and return the maze
 // Returns a pointer to an array [Row1,Row2,...,RowH] where Row = [Cell1,Cell2,...,CellW]
 // and  Cell = (1 = Wall, 0 = Path, 2 = Start, 3 = End)
-uint8_t* generate_maze(int width, int height) {
+uint8_t* generate_maze(int width, int height, int difficulty) {
     srand((unsigned int)time(NULL));
 
     // Allocate 1D array
@@ -51,9 +55,10 @@ uint8_t* generate_maze(int width, int height) {
         grid[i] = 1;
     }
 
+    int percentWall = (int)(100 * (log((7.4 * difficulty) + 1) / log(75)));
     // Carve starting at (1, 1)
     grid[width + 1] = 0;
-    carve(grid, width, height, 1, 1);
+    carve(grid, width, height, 1, 1, percentWall);
 
     // Set Start = 2 and End = 3
     grid[width] = 2;
