@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from c_package.c_maze import BitMaze
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAZE_FILE = PROJECT_ROOT / "maze.json"
@@ -8,17 +9,11 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 # Directions ordered clockwise: 0=North, 1=East, 2=South, 3=West
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
-def find_start(maze: list[list[int]]):
-    for y, row in enumerate(maze):
-        for x, cell in enumerate(row):
-            if cell == 2:
-                return (x, y)
-    return None
-
 def solve_right_wall(maze: list[list[int]]):
-    start = find_start(maze)
+    start = (0,1)
     height = len(maze)
     width = len(maze[0])
+    end = (width - 1, height - 2)
 
     x, y = start
     facing = 1  # Start facing East (into the maze from left edge)
@@ -27,7 +22,7 @@ def solve_right_wall(maze: list[list[int]]):
 
     while True:
         operations += 1  # Check if current cell is the exit
-        if maze[y][x] == 3:
+        if (x,y) == end:
             return path, operations
 
         # Check directions: Right (+1), Straight (0), Left (-1), Back (+2)
@@ -61,8 +56,7 @@ if __name__ == "__main__":
         print("Error: maze.json not found. Run main.py first to generate a maze.")
         sys.exit(1)
 
-    with open(MAZE_FILE, "r") as f:
-        maze = json.load(f)
+    maze = BitMaze.from_json(MAZE_FILE)
 
     path, operations = solve_right_wall(maze)
 

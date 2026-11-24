@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from c_package.c_maze import BitMaze
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAZE_FILE = PROJECT_ROOT / "maze.json"
@@ -8,17 +9,11 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 # Directions: North, East, South, West
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
-def find_start(maze: list[list[int]]):
-    for y, row in enumerate(maze):
-        for x, cell in enumerate(row):
-            if cell == 2:
-                return (x, y)
-    return None
-
 def solve_dfs(maze: list[list[int]]):
-    start = find_start(maze)
+    start = (0,1)
     height = len(maze)
     width = len(maze[0])
+    end = (width -1, height - 2)
 
     stack = [start]
     came_from = {start: None}
@@ -28,7 +23,7 @@ def solve_dfs(maze: list[list[int]]):
         x, y = stack.pop()
         operations += 1  # Count popping/visiting a cell from the stack
 
-        if maze[y][x] == 3:
+        if (x,y) == end:
             # Reconstruct the discovered path from End back to Start
             path = []
             curr = (x, y)
@@ -51,7 +46,7 @@ def solve_dfs(maze: list[list[int]]):
 
 def print_solved_maze(maze: list[list[int]], path: list[tuple[int, int]]):
     path_set = set(path)
-    symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
+    symbols = {0: "  ", 1: "##"}
 
     for y, row in enumerate(maze):
         line = []
@@ -67,8 +62,7 @@ if __name__ == "__main__":
         print("Error: maze.json not found. Run main.py first to generate a maze.")
         sys.exit(1)
 
-    with open(MAZE_FILE, "r") as f:
-        maze = json.load(f)
+    maze = BitMaze.from_json(MAZE_FILE)
 
     path, operations = solve_dfs(maze)
 

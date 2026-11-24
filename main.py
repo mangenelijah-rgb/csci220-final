@@ -10,11 +10,11 @@ if __name__ == "__main__": #Example run command for width 25, height 29, and dif
 
     #saves the maze to a file so multiple maze solutions can be run on the same maze
     with open("maze.json", "w") as f:
-        json.dump(maze, f)
+        json.dump({"w": maze.width, "h": maze.height, "data": list(maze._packed)}, f)
 
-    symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
-    for row in maze:
-        print("".join(symbols[cell] for cell in row))
+    #symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
+    #for row in maze:
+    #    print("".join(symbols[cell] for cell in row))
     
     #print(maze[3]) #Access a row
     #print(maze[3][5]) #Access a particular cell

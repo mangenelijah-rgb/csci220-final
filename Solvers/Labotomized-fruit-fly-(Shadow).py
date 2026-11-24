@@ -3,6 +3,7 @@ import math
 import random
 import sys
 from pathlib import Path
+from c_package.c_maze import BitMaze
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAZE_FILE = PROJECT_ROOT / "maze.json"
@@ -111,9 +112,10 @@ class DrosophilaSteeringCircuit:
         return best_turn, ops
 
 def solve_fruitfly(maze: list[list[int]]):
-    start, end = find_start_and_end(maze)
+    start = (0,1)
     height = len(maze)
     width = len(maze[0])
+    end = (width - 1, height - 2)
 
     fly_brain = DrosophilaSteeringCircuit()
     x, y = start
@@ -161,7 +163,7 @@ def solve_fruitfly(maze: list[list[int]]):
 
 def print_solved_maze(maze: list[list[int]], path: list[tuple[int, int]]):
     path_set = set(path)
-    symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
+    symbols = {0: "  ", 1: "##"}
 
     for y, row in enumerate(maze):
         line = []
@@ -177,8 +179,7 @@ if __name__ == "__main__":
         print("Error: maze.json not found. Run main.py first to generate a maze.")
         sys.exit(1)
 
-    with open(MAZE_FILE, "r") as f:
-        maze = json.load(f)
+    maze = BitMaze.from_json(MAZE_FILE)
 
     path, operations = solve_fruitfly(maze)
 
