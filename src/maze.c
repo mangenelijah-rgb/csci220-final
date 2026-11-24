@@ -1,121 +1,73 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
+#include <maze.h>
 #include <math.h>
-#include "maze.h"
 
-// Bitwise helper functions
-static inline int get_bit(const uint32_t *grid, int idx) {
-    return (grid[idx >> 5] >> (idx & 31)) & 1U;
-}
-
-static inline void set_path(uint32_t *grid, int idx) {
-    grid[idx >> 5] &= ~(1U << (idx & 31)); // Set bit to 0
-}
-
-// Compact state struct (8 bytes per frame instead of ~64+ bytes on the call stack)
-typedef struct {
-    int16_t x;
-    int16_t y;
-    uint8_t dirs[4];
-    uint8_t idx;
-} CarveFrame;
-
-static void shuffle(uint8_t *array, int n) {
+// Fisher-Yates shuffle algorithm; randomly change directions
+void shuffle(int *array, int n) {
     for (int i = 0; i < n - 1; i++) {
         int j = i + rand() / (RAND_MAX / (n - i) + 1);
-        uint8_t temp = array[j];
+        int temp = array[j];
         array[j] = array[i];
         array[i] = temp;
     }
 }
 
-void carve(uint32_t *grid, int width, int height, int start_x, int start_y, int percentWall) {
-    // Only odd coordinates are visited, so max depth is at most (width / 2) * (height / 2)
-    size_t max_depth = (size_t)((width / 2 + 1) * (height / 2 + 1));
-    CarveFrame *stack = (CarveFrame *)malloc(max_depth * sizeof(CarveFrame));
-    if (!stack) return;
+void carve(uint8_t *grid, int width, int height, int x, int y, int percentWall) {
+    int directions[] = {0, 1, 2, 3};
+    shuffle(directions, 4);
 
-    const int dx[] = {0, 2, 0, -2};
-    const int dy[] = {-2, 0, 2, 0};
+    int dx[] = {0, 2, 0, -2};
+    int dy[] = {-2, 0, 2, 0};
 
-    // Push the initial starting cell onto the stack
-    int top = 0;
-    stack[0] = (CarveFrame){
-        .x = (int16_t)start_x,
-        .y = (int16_t)start_y,
-        .dirs = {0, 1, 2, 3},
-        .idx = 0
-    };
-    shuffle(stack[0].dirs, 4);
-
-    while (top >= 0) {
-        CarveFrame *curr = &stack[top];
-
-        // If all 4 directions for this cell are checked, pop and backtrack
-        if (curr->idx >= 4) {
-            top--;
-            continue;
-        }
-
-        int dir = curr->dirs[curr->idx++];
-        int nx = curr->x + dx[dir];
-        int ny = curr->y + dy[dir];
+    for (int i = 0; i < 4; i++) {
+        int dir = directions[i];
+        int nx = x + dx[dir];
+        int ny = y + dy[dir];
 
         if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1) {
-            int next_idx = ny * width + nx;
-            int mid_idx = (curr->y + dy[dir] / 2) * width + (curr->x + dx[dir] / 2);
-
-            if (get_bit(grid, next_idx) == 1) { // Unvisited wall
-                set_path(grid, mid_idx);
-                set_path(grid, next_idx);
-
-                // Push the new cell onto the stack to explore it next
-                top++;
-                stack[top] = (CarveFrame){
-                    .x = (int16_t)nx,
-                    .y = (int16_t)ny,
-                    .dirs = {0, 1, 2, 3},
-                    .idx = 0
-                };
-                shuffle(stack[top].dirs, 4);
-            } else if ((rand() % 100) >= percentWall) {
-                set_path(grid, mid_idx);
+            // Convert 2D coordinates (ny, nx) to 1D index: y * width + x
+            if (grid[ny * width + nx] == 1) { //if (nx,ny) is a wall
+                grid[(y + dy[dir] / 2) * width + (x + dx[dir] / 2)] = 0;
+                grid[ny * width + nx] = 0; // Set (nx,ny) and (nx-1,ny-1) to paths
+                carve(grid, width, height, nx, ny, percentWall); //Recursive call until algorithm encounters a path or array boundary
+            } // After recursive call returns, for loop checks the next direction
+            else if ((rand()%100) >= percentWall) {
+                grid[(y + dy[dir] / 2) * width + (x + dx[dir] / 2)] = 0;
             }
         }
     }
-
-    free(stack);
 }
 
-
-uint32_t* generate_maze(int width, int height, int difficulty) {
+// Function to generate and return the maze
+// Returns a pointer to an array [Row1,Row2,...,RowH] where Row = [Cell1,Cell2,...,CellW]
+// and  Cell = (1 = Wall, 0 = Path, 2 = Start, 3 = End)
+uint8_t* generate_maze(int width, int height, int difficulty) {
     srand((unsigned int)time(NULL));
 
-    int total_cells = width * height;
-    // Ceiling division: (total_cells + 31) / 32
-    size_t num_ints = (total_cells + 31) >> 5;
-
-    uint32_t *grid = (uint32_t*)malloc(num_ints * sizeof(uint32_t));
+    // Allocate 1D array
+    uint8_t *grid = (uint8_t*)malloc(width * height * sizeof(uint8_t));
     if (!grid) return NULL;
 
-    // Fill all bits with 1 (0xFF sets every byte to 11111111)
-    memset(grid, 0xFF, num_ints * sizeof(uint32_t));
+    // Fill with walls (1)
+    for (int i = 0; i < width * height; i++) {
+        grid[i] = 1;
+    }
 
     int percentWall = (int)(100 * (log((7.4 * difficulty) + 1) / log(75)));
-
     // Carve starting at (1, 1)
-    set_path(grid, width + 1);
+    grid[width + 1] = 0;
     carve(grid, width, height, 1, 1, percentWall);
 
-    // Set Start and End to 0 (Path) as requested
-    set_path(grid, width);
-    set_path(grid, (height - 2) * width + (width - 1));
+    // Set Start = 2 and End = 3
+    grid[width] = 2;
+    grid[(height - 2) * width + (width - 1)] = 3;
 
     return grid;
 }
 
-void free_maze(uint32_t *grid) {
+// Exported function to prevent memory leaks
+void free_maze(uint8_t *grid) {
     free(grid);
 }

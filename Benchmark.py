@@ -3,7 +3,6 @@ import json
 import sys
 import time
 from pathlib import Path
-from c_package.c_maze import BitMaze
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SOLVERS_DIR = PROJECT_ROOT / "Solvers"
@@ -37,7 +36,8 @@ if __name__ == "__main__":
         print("Error: maze.json not found. Run 'python3 main.py' first.")
         sys.exit(1)
 
-    maze = BitMaze.from_json(MAZE_FILE)
+    with open(MAZE_FILE, "r") as f:
+        maze = json.load(f)
 
     solvers = [
         ("Breadth-First Search (BFS)",      "Breadth-first-search.py",           "solve_bfs"),
@@ -72,7 +72,7 @@ if __name__ == "__main__":
             print("=" * 55)
             print(f"{idx}. {label}")
             print("=" * 55)
-            #print_solved_maze(maze, path)
+            print_solved_maze(maze, path)
             print(f"\nSteps taken: {steps} | Total operations: {operations} | Time: {elapsed_ms:.3f} ms\n")
 
         except Exception as e:
