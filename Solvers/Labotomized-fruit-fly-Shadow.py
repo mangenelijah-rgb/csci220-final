@@ -3,8 +3,9 @@ import math
 import random
 import sys
 from pathlib import Path
+from c_package.c_maze import BitMaze, SolverResult
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAZE_FILE = PROJECT_ROOT / "maze.json"
 
 # Directions ordered clockwise: 0=North, 1=East, 2=South, 3=West
@@ -139,101 +140,113 @@ class DrosophilaSteeringCircuit:
         return best_turn, ticks * 9
 
 
-def solve_fruitfly(maze: list[list[int]]):
-    start = (0,1)
+def solve_fruitfly(
+    maze: BitMaze,
+    output_dir: str | Path = PROJECT_ROOT / "results",
+    chunk_size: int = 50_000,
+) -> SolverResult:
+    start = (0, 1)
     height = len(maze)
     width = len(maze[0])
     end = (width - 1, height - 2)
     ex, ey = end
     sx, sy = start
 
-    fly_brain = DrosophilaSteeringCircuit()
-    x, y = start
-    facing = 1  # Start facing East
-    path = [(x, y)]
-    visit_counts = {(x, y): 1}
-    dead_ends = set()
-    total_operations = 0
-    hypot = math.hypot
+    with SolverResult(
+        algorithm="Lobotomized Fruit Fly (Shadow)",
+        width=width,
+        height=height,
+        output_dir=output_dir,
+        prefix="fruitfly",
+        chunk_size=chunk_size,
+    ) as result:
+        fly_brain = DrosophilaSteeringCircuit()
+        x, y = start
+        facing = 1  # Start facing East
+        path = [(x, y)]
+        result.record_search(x, y)
 
-    while (x, y) != end:
-        total_operations += 1
+        visit_counts = {(x, y): 1}
+        dead_ends = set()
+        hypot = math.hypot
 
-        # Count open non-dead-end neighbors to seal retreating dead-end branches
-        active_exits = 0
-        if y > 0 and maze[y - 1][x] != 1 and (x, y - 1) not in dead_ends:
-            active_exits += 1
-        if x + 1 < width and maze[y][x + 1] != 1 and (x + 1, y) not in dead_ends:
-            active_exits += 1
-        if y + 1 < height and maze[y + 1][x] != 1 and (x, y + 1) not in dead_ends:
-            active_exits += 1
-        if x > 0 and maze[y][x - 1] != 1 and (x - 1, y) not in dead_ends:
-            active_exits += 1
+        while (x, y) != end:
+            result.operations += 1
 
-        if active_exits <= 1 and (x, y) != (sx, sy):
-            dead_ends.add((x, y))
+            active_exits = 0
+            if y > 0 and maze[y - 1][x] != 1 and (x, y - 1) not in dead_ends:
+                active_exits += 1
+            if x + 1 < width and maze[y][x + 1] != 1 and (x + 1, y) not in dead_ends:
+                active_exits += 1
+            if y + 1 < height and maze[y + 1][x] != 1 and (x, y + 1) not in dead_ends:
+                active_exits += 1
+            if x > 0 and maze[y][x - 1] != 1 and (x - 1, y) not in dead_ends:
+                active_exits += 1
 
-        curr_dist = hypot(ex - x, ey - y)
-        d_left = (facing - 1) & 3
-        d_right = (facing + 1) & 3
+            if active_exits <= 1 and (x, y) != (sx, sy):
+                dead_ends.add((x, y))
 
-        lx, ly = x + DIRS[d_left][0], y + DIRS[d_left][1]
-        fx, fy = x + DIRS[facing][0], y + DIRS[facing][1]
-        rx, ry = x + DIRS[d_right][0], y + DIRS[d_right][1]
+            curr_dist = hypot(ex - x, ey - y)
+            d_left = (facing - 1) & 3
+            d_right = (facing + 1) & 3
 
-        # Treat sealed dead ends as closed walls unless ALL directions are sealed
-        raw_o0 = 0 <= lx < width and 0 <= ly < height and maze[ly][lx] != 1
-        raw_o1 = 0 <= fx < width and 0 <= fy < height and maze[fy][fx] != 1
-        raw_o2 = 0 <= rx < width and 0 <= ry < height and maze[ry][rx] != 1
+            lx, ly = x + DIRS[d_left][0], y + DIRS[d_left][1]
+            fx, fy = x + DIRS[facing][0], y + DIRS[facing][1]
+            rx, ry = x + DIRS[d_right][0], y + DIRS[d_right][1]
 
-        o0 = raw_o0 and (lx, ly) not in dead_ends
-        o1 = raw_o1 and (fx, fy) not in dead_ends
-        o2 = raw_o2 and (rx, ry) not in dead_ends
+            raw_o0 = 0 <= lx < width and 0 <= ly < height and maze[ly][lx] != 1
+            raw_o1 = 0 <= fx < width and 0 <= fy < height and maze[fy][fx] != 1
+            raw_o2 = 0 <= rx < width and 0 <= ry < height and maze[ry][rx] != 1
 
-        if not (o0 or o1 or o2):
-            o0, o1, o2 = raw_o0, raw_o1, raw_o2
+            o0 = raw_o0 and (lx, ly) not in dead_ends
+            o1 = raw_o1 and (fx, fy) not in dead_ends
+            o2 = raw_o2 and (rx, ry) not in dead_ends
 
-        if o0:
-            g0 = max(-1.0, min(1.0, curr_dist - hypot(ex - lx, ey - ly)))
-            p0 = float(visit_counts.get((lx, ly), 0)) * 2.5
-        else:
-            g0 = p0 = 0.0
+            if not (o0 or o1 or o2):
+                o0, o1, o2 = raw_o0, raw_o1, raw_o2
 
-        if o1:
-            g1 = max(-1.0, min(1.0, curr_dist - hypot(ex - fx, ey - fy)))
-            p1 = float(visit_counts.get((fx, fy), 0)) * 2.5
-        else:
-            g1 = p1 = 0.0
+            if o0:
+                g0 = max(-1.0, min(1.0, curr_dist - hypot(ex - lx, ey - ly)))
+                p0 = float(visit_counts.get((lx, ly), 0)) * 2.5
+            else:
+                g0 = p0 = 0.0
 
-        if o2:
-            g2 = max(-1.0, min(1.0, curr_dist - hypot(ex - rx, ey - ry)))
-            p2 = float(visit_counts.get((rx, ry), 0)) * 2.5
-        else:
-            g2 = p2 = 0.0
+            if o1:
+                g1 = max(-1.0, min(1.0, curr_dist - hypot(ex - fx, ey - fy)))
+                p1 = float(visit_counts.get((fx, fy), 0)) * 2.5
+            else:
+                g1 = p1 = 0.0
 
-        chosen_turn, neural_ops = fly_brain.decide_turn((o0, o1, o2), (g0, g1, g2), (p0, p1, p2))
-        total_operations += neural_ops + 3
+            if o2:
+                g2 = max(-1.0, min(1.0, curr_dist - hypot(ex - rx, ey - ry)))
+                p2 = float(visit_counts.get((rx, ry), 0)) * 2.5
+            else:
+                g2 = p2 = 0.0
 
-        facing = (facing + chosen_turn) & 3
-        dx, dy = DIRS[facing]
-        x += dx
-        y += dy
+            chosen_turn, neural_ops = fly_brain.decide_turn((o0, o1, o2), (g0, g1, g2), (p0, p1, p2))
+            result.operations += neural_ops + 3
 
-        pos = (x, y)
-        path.append(pos)
-        visit_counts[pos] = visit_counts.get(pos, 0) + 1
+            facing = (facing + chosen_turn) & 3
+            dx, dy = DIRS[facing]
+            x += dx
+            y += dy
 
-    return path, total_operations
+            pos = (x, y)
+            path.append(pos)
+            result.record_search(x, y)
+            visit_counts[pos] = visit_counts.get(pos, 0) + 1
+
+        result.set_solution_path(path)
+        return result
 
 
-def print_solved_maze(maze: list[list[int]], path: list[tuple[int, int]]):
-    path_set = set(path)
+def print_solved_maze(maze: BitMaze, result: SolverResult):
     symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
 
     for y, row in enumerate(maze):
         line = []
         for x, cell in enumerate(row):
-            if (x, y) in path_set and cell == 0:
+            if result.is_on_path(x, y) and cell == 0:
                 line.append("• ")
             else:
                 line.append(symbols[cell])
@@ -245,13 +258,10 @@ if __name__ == "__main__":
         print("Error: maze.json not found. Run main.py first to generate a maze.")
         sys.exit(1)
 
-    with open(MAZE_FILE, "r") as f:
-        maze = json.load(f)
-
-    path, operations = solve_fruitfly(maze)
+    maze = BitMaze.from_json(MAZE_FILE)
+    result = solve_fruitfly(maze)
 
     print("Labotimized fruitfly: aka my online friend Shapeless Shadow.\n")
-    print_solved_maze(maze, path)
-
-    print(f"\nSteps taken: {len(path) - 1}")
-    print(f"Total operations: {operations}")
+    print_solved_maze(maze, result)
+    print(f"\nSteps taken: {result.steps}")
+    print(f"Total operations: {result.operations}")

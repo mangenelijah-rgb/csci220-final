@@ -2,60 +2,76 @@ import json
 import sys
 from pathlib import Path
 from c_package.c_maze import BitMaze
+from c_package.c_maze import SolverResult
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAZE_FILE = PROJECT_ROOT / "maze.json"
 
 # Directions: North, East, South, West
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
-def solve_dfs(maze: list[list[int]]):
-    start = (0,1)
+
+def solve_dfs(
+    maze: BitMaze,
+    output_dir: str | Path = PROJECT_ROOT / "results",
+    chunk_size: int = 50_000,
+) -> SolverResult:
+    start = (0, 1)
     height = len(maze)
     width = len(maze[0])
-    end = (width -1, height - 2)
+    end = (width - 1, height - 2)
 
-    stack = [start]
-    came_from = {start: None}
-    operations = 0
+    with SolverResult(
+        algorithm="Depth-First Search (DFS)",
+        width=width,
+        height=height,
+        output_dir=output_dir,
+        prefix="dfs",
+        chunk_size=chunk_size,
+    ) as result:
+        stack = [start]
+        came_from = {start: None}
 
-    while stack:
-        x, y = stack.pop()
-        operations += 1  # Count popping/visiting a cell from the stack
+        while stack:
+            x, y = stack.pop()
+            result.operations += 1
+            result.record_search(x, y)
 
-        if (x,y) == end:
-            # Reconstruct the discovered path from End back to Start
-            path = []
-            curr = (x, y)
-            while curr is not None:
-                path.append(curr)
-                curr = came_from[curr]
-            path.reverse()
-            return path, operations
+            if (x, y) == end:
+                path = []
+                curr = (x, y)
+                while curr is not None:
+                    path.append(curr)
+                    curr = came_from[curr]
+                path.reverse()
 
-        for dx, dy in DIRS:
-            operations += 1  # Count each neighbor inspection as an operation
-            nx, ny = x + dx, y + dy
+                result.set_solution_path(path)
+                return result
 
-            if 0 <= nx < width and 0 <= ny < height:
-                if maze[ny][nx] != 1 and (nx, ny) not in came_from:
-                    came_from[(nx, ny)] = (x, y)
-                    stack.append((nx, ny))
+            for dx, dy in DIRS:
+                result.operations += 1
+                nx, ny = x + dx, y + dy
 
-    return [], operations
+                if 0 <= nx < width and 0 <= ny < height:
+                    if maze[ny][nx] != 1 and (nx, ny) not in came_from:
+                        came_from[(nx, ny)] = (x, y)
+                        stack.append((nx, ny))
 
-def print_solved_maze(maze: list[list[int]], path: list[tuple[int, int]]):
-    path_set = set(path)
+        return result
+
+
+def print_solved_maze(maze: BitMaze, result: SolverResult):
     symbols = {0: "  ", 1: "##"}
 
     for y, row in enumerate(maze):
         line = []
         for x, cell in enumerate(row):
-            if (x, y) in path_set and cell == 0:
+            if result.is_on_path(x, y) and cell == 0:
                 line.append("• ")
             else:
                 line.append(symbols[cell])
         print("".join(line))
+
 
 if __name__ == "__main__":
     if not MAZE_FILE.exists():
@@ -63,12 +79,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     maze = BitMaze.from_json(MAZE_FILE)
-
-    path, operations = solve_dfs(maze)
+    result = solve_dfs(maze)
 
     print("Algorithm: Depth-First Search (DFS)\n")
-    print_solved_maze(maze, path)
-
-    # Output stats and steps taken after the solved maze
-    print(f"\nSteps taken: {len(path) - 1}")
-    print(f"Total operations: {operations}")
+    print_solved_maze(maze, result)
+    print(f"\nSteps taken: {result.steps}")
+    print(f"Total operations: {result.operations}")

@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 from c_package.c_maze import BitMaze
+from c_package.c_maze import SolverResult
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAZE_FILE = PROJECT_ROOT / "maze.json"
@@ -9,47 +10,63 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 # Directions ordered clockwise: 0=North, 1=East, 2=South, 3=West
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
-def solve_left_wall(maze: list[list[int]]):
-    start = (0,1)
+
+def solve_left_wall(
+    maze: BitMaze,
+    output_dir: str | Path = PROJECT_ROOT / "results",
+    chunk_size: int = 50_000,
+) -> SolverResult:
+    start = (0, 1)
     height = len(maze)
     width = len(maze[0])
     end = (width - 1, height - 2)
 
-    x, y = start
-    facing = 1  # Start facing East (into the maze from left edge)
-    path = [(x, y)]
-    operations = 0
+    with SolverResult(
+        algorithm="Left-Wall Follower",
+        width=width,
+        height=height,
+        output_dir=output_dir,
+        prefix="left_wall",
+        chunk_size=chunk_size,
+    ) as result:
+        x, y = start
+        facing = 1  # Start facing East
+        path = [(x, y)]
+        result.record_search(x, y)
 
-    while True:
-        operations += 1  # Check if current cell is the exit
-        if (x,y) == end:
-            return path, operations
+        while True:
+            result.operations += 1
+            if (x, y) == end:
+                result.set_solution_path(path)
+                return result
 
-        # Check directions: Left (-1), Straight (0), Right (+1), Back (+2)
-        for turn in (-1, 0, 1, 2):
-            operations += 1  # Count each neighbor inspection as an operation
-            next_dir = (facing + turn) % 4
-            dx, dy = DIRS[next_dir]
-            nx, ny = x + dx, y + dy
+            # Check directions: Left (-1), Straight (0), Right (+1), Back (+2)
+            for turn in (-1, 0, 1, 2):
+                result.operations += 1
+                next_dir = (facing + turn) % 4
+                dx, dy = DIRS[next_dir]
+                nx, ny = x + dx, y + dy
 
-            if 0 <= nx < width and 0 <= ny < height and maze[ny][nx] != 1:
-                x, y = nx, ny
-                facing = next_dir
-                path.append((x, y))
-                break
+                if 0 <= nx < width and 0 <= ny < height and maze[ny][nx] != 1:
+                    x, y = nx, ny
+                    facing = next_dir
+                    path.append((x, y))
+                    result.record_search(x, y)
+                    break
 
-def print_solved_maze(maze: list[list[int]], path: list[tuple[int, int]]):
-    path_set = set(path)
+
+def print_solved_maze(maze: BitMaze, result: SolverResult):
     symbols = {0: "  ", 1: "##"}
 
     for y, row in enumerate(maze):
         line = []
         for x, cell in enumerate(row):
-            if (x, y) in path_set and cell == 0:
+            if result.is_on_path(x, y) and cell == 0:
                 line.append("• ")
             else:
                 line.append(symbols[cell])
         print("".join(line))
+
 
 if __name__ == "__main__":
     if not MAZE_FILE.exists():
@@ -57,12 +74,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     maze = BitMaze.from_json(MAZE_FILE)
-
-    path, operations = solve_left_wall(maze)
+    result = solve_left_wall(maze)
 
     print("Algorithm: Left-Wall Follower\n")
-    print_solved_maze(maze, path)
-
-    # Output stats and steps taken after the solved maze
-    print(f"\nSteps taken: {len(path) - 1}")
-    print(f"Total operations: {operations}")
+    print_solved_maze(maze, result)
+    print(f"\nSteps taken: {result.steps}")
+    print(f"Total operations: {result.operations}")

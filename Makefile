@@ -26,6 +26,12 @@ OBJS := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 # Map each .o file to a corresponding .d dependency file
 DEPS := $(OBJS:.o=.d)
 
+AMALGAM_OUT   := $(BUILD_DIR)/amalgam.md
+AMALGAM_FILES := Makefile \
+                 $(shell find $(INC_DIR) -name '*.h' 2>/dev/null | sort) \
+                 $(shell echo "$(SRCS)" | tr ' ' '\n' | sort) \
+                 $(shell find . -maxdepth 3 -name '*.py' ! -path './.venv/*' ! -path './venv/*' 2>/dev/null | sort)
+
 # Default target
 all: $(TARGET)
 
@@ -39,8 +45,24 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+# Generate a single file containing all workspace context
+amalgam:
+	@mkdir -p $(BUILD_DIR)
+	@rm -f $(AMALGAM_OUT)
+	@for f in $(AMALGAM_FILES); do \
+		if [ -f "$$f" ]; then \
+			printf "\n========================================\nFILE: %s\n========================================\n" "$$f" >> $(AMALGAM_OUT); \
+			cat "$$f" >> $(AMALGAM_OUT); \
+			printf "\n" >> $(AMALGAM_OUT); \
+		fi; \
+	done
+	@echo "Created context amalgam at $(AMALGAM_OUT)"
+
 # Include auto-generated header dependency rules
 -include $(DEPS)
+
+
+
 
 # Clean build artifacts
 clean:
