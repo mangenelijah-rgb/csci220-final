@@ -9,8 +9,6 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 
 # Directions ordered clockwise: 0=North, 1=East, 2=South, 3=West
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))
-
-
 def find_start_and_end(maze: list[list[int]]):
     start = None
     end = None
@@ -21,7 +19,6 @@ def find_start_and_end(maze: list[list[int]]):
             elif cell == 3:
                 end = (x, y)
     return start, end
-
 
 class DrosophilaSteeringCircuit:
     """
@@ -156,6 +153,7 @@ def solve_fruitfly(maze: list[list[int]]):
     start, end = find_start_and_end(maze)
     height = len(maze)
     width = len(maze[0])
+    end = (width - 1, height - 2)
     ex, ey = end
     sx, sy = start
 
