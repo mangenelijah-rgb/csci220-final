@@ -16,10 +16,10 @@ def solve_dfs(
     output_dir: str | Path = PROJECT_ROOT / "results",
     chunk_size: int = 50_000,
 ) -> SolverResult:
-    start = (0, 1)
+    start = maze.start
     height = len(maze)
     width = len(maze[0])
-    end = (width - 1, height - 2)
+    end = maze.end
 
     with SolverResult(
         algorithm="Depth-First Search (DFS)",

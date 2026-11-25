@@ -49,12 +49,28 @@ class _MazeRow:
 
 class BitMaze:
     """Memory-efficient bit-packed 2D maze supporting maze[y][x] access."""
-    __slots__ = ("width", "height", "_packed")
+    __slots__ = ("width", "height", "_packed", "start", "end")
 
-    def __init__(self, width: int, height: int, packed: array.array):
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        packed: array.array,
+        start: tuple[int, int] | None = None,
+        end: tuple[int, int] | None = None,
+    ):
         self.width = width
         self.height = height
         self._packed = packed
+        self.start = start if start is not None else (0, 1)
+        self.end = end if end is not None else (width - 1, height - 2)
+
+    def set_path(self, x: int, y: int) -> None:
+        """Sets the bit at (x, y) to 0 (open path)."""
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise IndexError("Coordinates out of bounds")
+        idx = y * self.width + x
+        self._packed[idx >> 5] &= ~(1 << (idx & 31))
 
     @classmethod
     def from_json(cls, filepath: str | Path) -> "BitMaze":
@@ -62,7 +78,10 @@ class BitMaze:
         with open(filepath, "r") as f:
             payload = json.load(f)
         packed = array.array("I", payload["data"])
-        return cls(payload["w"], payload["h"], packed)
+        default_end = (payload["w"] - 1, payload["h"] - 2)
+        start = tuple(payload["start"]) if "start" in payload else (0, 1)
+        end = tuple(payload["end"]) if "end" in payload else default_end
+        return cls(payload["w"], payload["h"], packed, start=start, end=end)
 
     def __getitem__(self, y: int) -> _MazeRow:
         if y < 0:

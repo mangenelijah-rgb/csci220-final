@@ -12,10 +12,10 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
 def solve_bfs(maze, output_dir: str | Path = "results", chunk_size: int = 50_000) -> SolverResult:
-    start = (0, 1)
+    start = maze.start
     height = len(maze)
     width = len(maze[0])
-    end = (width - 1, height - 2)
+    end = maze.end
 
     with SolverResult(
         algorithm="Breadth-First Search (BFS)",

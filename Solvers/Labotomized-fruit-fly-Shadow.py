@@ -11,6 +11,16 @@ MAZE_FILE = PROJECT_ROOT / "maze.json"
 # Directions ordered clockwise: 0=North, 1=East, 2=South, 3=West
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))
 
+def get_initial_facing(start: tuple[int, int], width: int, height: int) -> int:
+    sx, sy = start
+    if sy == 0:
+        return 2  # Top wall -> face South
+    if sx == width - 1:
+        return 3  # Right wall -> face West
+    if sy == height - 1:
+        return 0  # Bottom wall -> face North
+    return 1      # Left wall -> face East
+
 class DrosophilaSteeringCircuit:
     """
     Spiking Leaky Integrate-and-Fire (LIF) model based on the Drosophila
@@ -145,10 +155,10 @@ def solve_fruitfly(
     output_dir: str | Path = PROJECT_ROOT / "results",
     chunk_size: int = 50_000,
 ) -> SolverResult:
-    start = (0, 1)
+    start = maze.start
     height = len(maze)
     width = len(maze[0])
-    end = (width - 1, height - 2)
+    end = maze.end
     ex, ey = end
     sx, sy = start
 
@@ -162,7 +172,7 @@ def solve_fruitfly(
     ) as result:
         fly_brain = DrosophilaSteeringCircuit()
         x, y = start
-        facing = 1  # Start facing East
+        facing = get_initial_facing(start, width, height)
         path = [(x, y)]
         result.record_search(x, y)
 

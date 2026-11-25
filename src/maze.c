@@ -109,10 +109,6 @@ uint32_t* generate_maze(int width, int height, int difficulty) {
     set_path(grid, width + 1);
     carve(grid, width, height, 1, 1, percentWall);
 
-    // Set Start and End to 0 (Path) as requested
-    set_path(grid, width);
-    set_path(grid, (height - 2) * width + (width - 1));
-
     return grid;
 }
 

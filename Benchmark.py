@@ -96,7 +96,7 @@ if __name__ == "__main__":
             print("=" * 65)
             print(f"{idx}. {label}")
             print("=" * 65)
-            # print_solved_maze(maze, solver_res)
+            print_solved_maze(maze, solver_res)
             print(
                 f"\nSteps: {steps} | Operations: {solver_res.operations} | "
                 f"Searched: {solver_res.searched_count} ({len(solver_res._chunk_files)} JSON chunks) | "
