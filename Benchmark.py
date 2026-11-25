@@ -6,13 +6,24 @@ from c_package.c_maze import BitMaze, SolverResult
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SOLVERS_DIR = PROJECT_ROOT / "Solvers"
-MAZE_FILE = PROJECT_ROOT / "maze.json"
-RESULTS_DIR = PROJECT_ROOT / "results"
+RUNS_DIR = PROJECT_ROOT / "runs"
 CHUNK_SIZE = 50_000
 
 
+def resolve_run_dir() -> Path:
+    """Uses the CLI argument if provided, otherwise falls back to runs/latest.txt."""
+    if len(sys.argv) > 1:
+        return Path(sys.argv[1]).resolve()
+
+    latest_ptr = RUNS_DIR / "latest.txt"
+    if latest_ptr.exists():
+        return Path(latest_ptr.read_text().strip())
+
+    print("Error: No run directory specified and runs/latest.txt not found. Run main.py first.")
+    sys.exit(1)
+
+
 def load_solver_module(filename: str):
-    """Dynamically imports solver files even when filenames contain hyphens or parentheses."""
     file_path = SOLVERS_DIR / filename
     if not file_path.exists():
         raise FileNotFoundError(f"Could not find {file_path}")
@@ -24,7 +35,6 @@ def load_solver_module(filename: str):
 
 def print_solved_maze(maze: BitMaze, result: SolverResult):
     symbols = {0: "  ", 1: "##", 2: "S ", 3: "E "}
-
     for y, row in enumerate(maze):
         line = []
         for x, cell in enumerate(row):
@@ -36,33 +46,39 @@ def print_solved_maze(maze: BitMaze, result: SolverResult):
 
 
 if __name__ == "__main__":
-    if not MAZE_FILE.exists():
-        print("Error: maze.json not found. Run 'python3 main.py' first.")
+    run_dir = resolve_run_dir()
+    maze_file = run_dir / "maze.json"
+    results_dir = run_dir / "results"
+
+    if not maze_file.exists():
+        print(f"Error: {maze_file} not found.")
         sys.exit(1)
 
-    maze = BitMaze.from_json(MAZE_FILE)
+    maze = BitMaze.from_json(maze_file)
 
     solvers = [
-        ("Breadth-First Search (BFS)",      "Breadth-first-search.py",           "solve_bfs"),
-        ("Depth-First Search (DFS)",        "Depth-first-search.py",             "solve_dfs"),
-        ("Left-Wall Follower",              "Left-wall-follow.py",               "solve_left_wall"),
-        ("Right-Wall Follower",             "Right-wall-follow.py",              "solve_right_wall"),
-        ("Lobotomized Fruit Fly (Shadow)",  "Labotomized-fruit-fly-Shadow.py", "solve_fruitfly"),
+        ("Breadth-First Search (BFS)",      "Breadth-first-search.py",           "solve_bfs",        "bfs"),
+        ("Depth-First Search (DFS)",        "Depth-first-search.py",             "solve_dfs",        "dfs"),
+        ("Left-Wall Follower",              "Left-wall-follow.py",               "solve_left_wall",  "left_wall"),
+        ("Right-Wall Follower",             "Right-wall-follow.py",              "solve_right_wall", "right_wall"),
+        ("Lobotomized Fruit Fly (Shadow)",  "Labotomized-fruit-fly-Shadow.py", "solve_fruitfly",   "fruitfly"),
     ]
 
     results = []
-
+    print(f"Run directory: {run_dir}")
     print(f"Running {len(solvers)} solvers on {maze.width}x{maze.height} maze...\n")
 
-    for idx, (label, filename, func_name) in enumerate(solvers, start=1):
+    for idx, (label, filename, func_name, subdir) in enumerate(solvers, start=1):
         try:
             mod = load_solver_module(filename)
             solve_fn = getattr(mod, func_name)
 
+            solver_out_dir = results_dir / subdir
+
             start_time = time.perf_counter()
             solver_res: SolverResult = solve_fn(
                 maze,
-                output_dir=RESULTS_DIR,
+                output_dir=solver_out_dir,
                 chunk_size=CHUNK_SIZE,
             )
             elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -81,15 +97,6 @@ if __name__ == "__main__":
             print(f"{idx}. {label}")
             print("=" * 65)
             # print_solved_maze(maze, solver_res)
-
-
-            #To get each step of the solution:
-            #print(f"Search order for {solver_res.algorithm}:")
-            #for step, (x, y) in enumerate(solver_res.iter_searched()):
-            #    print(f"Step {step}: ({x}, {y})")
-
-
-
             print(
                 f"\nSteps: {steps} | Operations: {solver_res.operations} | "
                 f"Searched: {solver_res.searched_count} ({len(solver_res._chunk_files)} JSON chunks) | "
